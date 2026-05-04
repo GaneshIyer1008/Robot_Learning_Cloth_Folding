@@ -1,0 +1,69 @@
+<mujoco model="cloth_folding">
+
+  <include file="../SO-ARM100/Simulation/SO101/so101_new_calib.xml"/>
+
+  <!-- Placed after the include so this compiler is processed last and its meshdir
+       overrides the conflicting meshdir="assets" in so101_new_calib.xml.
+       MuJoCo resolves meshdir relative to the main file (scene.xml), so
+       "../SO-ARM100/Simulation/SO101/assets" correctly points to the assets dir. -->
+  <compiler angle="radian" autolimits="true"
+            meshdir="../SO-ARM100/Simulation/SO101/assets"/>
+
+  <option gravity="0 0 -9.81" integrator="implicitfast" timestep="0.005"/>
+
+  <visual>
+    <headlight diffuse="0.7 0.7 0.7" ambient="0.4 0.4 0.4" specular="0 0 0"/>
+    <global azimuth="160" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="2d" name="table_tex" builtin="flat" rgb1="0.85 0.80 0.72" width="64" height="64"/>
+    <material name="table_mat" texture="table_tex" reflectance="0.1"/>
+    <material name="cloth_mat" rgba="0.2 0.5 0.9 1"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.6 0.8 1.0" rgb2="0.2 0.3 0.5" width="512" height="512"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0.5 0 2.0" dir="0 0 -1" directional="true" diffuse="0.8 0.8 0.8"/>
+    <light pos="-0.3 0.5 1.5" dir="0.3 -0.5 -1" directional="true" diffuse="0.4 0.4 0.4"/>
+
+    <!-- Floor -->
+    <geom name="floor" type="plane" size="2 2 0.05" pos="0 0 0" rgba="0.4 0.4 0.4 1"/>
+
+    <!-- Table -->
+    <body name="table" pos="0 0 0">
+      <!-- table top surface at z=0.60 -->
+      <geom name="table_top" type="box" size="0.35 0.30 0.02" pos="0.15 0 0.60" material="table_mat"/>
+      <geom name="table_leg1" type="cylinder" size="0.02 0.29" pos="-0.15 -0.25 0.30"/>
+      <geom name="table_leg2" type="cylinder" size="0.02 0.29" pos="-0.15  0.25 0.30"/>
+      <geom name="table_leg3" type="cylinder" size="0.02 0.29" pos=" 0.45 -0.25 0.30"/>
+      <geom name="table_leg4" type="cylinder" size="0.02 0.29" pos=" 0.45  0.25 0.30"/>
+    </body>
+
+    <!-- SO-101 base mounted on the table (table top at z=0.62) -->
+    <body name="robot_mount" pos="0 0 0.62">
+      <geom type="box" size="0.04 0.04 0.01" rgba="0.3 0.3 0.3 1" contype="0" conaffinity="0"/>
+      <!-- attach the SO-101 base frame here via free joint trick:
+           the so101 worldbody/base is already included at world level above,
+           so we just mount by placing robot base body reference in scene. -->
+    </body>
+
+    <!-- "front" camera — matches observation.images.front key in dataset.
+         Positioned ~0.7m in front of robot, slightly elevated, angled down. -->
+    <camera name="front" pos="0.75 0 1.05" xyaxes="-1 0 0 0 -0.6 0.8"/>
+
+    <!-- "bev" camera — bird's-eye view directly above the workspace. -->
+    <camera name="bev" pos="0.2 0 1.5" xyaxes="1 0 0 0 1 0"/>
+
+    <!-- Cloth: 8x8 flex grid, 24cm x 24cm, lying flat on table.
+         Centred in front of the robot gripper workspace. -->
+    <!-- radius=0.005, spacing must be > 2*radius=0.01 -->
+    <flexcomp name="cloth" type="grid" count="8 8 1" spacing="0.03 0.03 0.03"
+              pos="0.25 0 0.625" mass="0.08" radius="0.005">
+      <contact condim="3" solref="0.008 1" solimp="0.95 0.99 0.001" selfcollide="none"/>
+      <edge damping="0.02"/>
+    </flexcomp>
+
+  </worldbody>
+
+</mujoco>

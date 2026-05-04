@@ -20,7 +20,7 @@ source .venv/bin/activate
 echo "📥 Verifying dataset: $DATASET_REPO_ID"
 
 python3 - << PYEOF
-from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 repo_id = "$DATASET_REPO_ID"
 dataset = LeRobotDataset(repo_id)
