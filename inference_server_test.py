@@ -99,7 +99,13 @@ else:
     motor_names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
 
     def get_observation() -> dict:
-        return robot.get_observation()
+        raw = robot.get_observation()
+        state = np.array([raw[f"{m}.pos"] for m in motor_names], dtype=np.float32)
+        image = np.transpose(raw["observation.images.front"], (2, 0, 1))  # HWC → CHW
+        return {
+            "observation.state": state,
+            "observation.images.front": image,
+        }
 
     def send_action(action: np.ndarray) -> None:
         action_dict = {f"{name}.pos": float(val) for name, val in zip(motor_names, action)}
