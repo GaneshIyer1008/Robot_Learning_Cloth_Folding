@@ -23,6 +23,7 @@ import base64
 import logging
 import os
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import numpy as np
 import requests
@@ -96,11 +97,13 @@ else:
     robot.connect()
     logger.info("Robot connected.")
 
-    motor_names = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+    # Derive key order from the robot itself — must match dataset ordering
+    state_keys = [k for k in robot.observation_features if k.endswith(".pos")]
+    action_keys = list(robot.action_features.keys())  # e.g. ["shoulder_pan.pos", ...]
 
     def get_observation() -> dict:
         raw = robot.get_observation()
-        state = np.array([raw[f"{m}.pos"] for m in motor_names], dtype=np.float32)
+        state = np.array([raw[k] for k in state_keys], dtype=np.float32)
         image = np.transpose(raw["observation.images.front"], (2, 0, 1))  # HWC → CHW
         return {
             "observation.state": state,
@@ -108,7 +111,9 @@ else:
         }
 
     def send_action(action: np.ndarray) -> None:
-        action_dict = {f"{name}.pos": float(val) for name, val in zip(motor_names, action)}
+        action = action.flatten()
+        action_dict = {k: float(v) for k, v in zip(action_keys, action)}
+        logger.info("Sending action: %s", action_dict)
         robot.send_action(action_dict)
 
     def cleanup() -> None:
@@ -148,16 +153,22 @@ def fetch_chunk(url: str) -> list[list[float]]:
 
 
 url = DEBUG_SERVER_URL if DEBUG_MODE else SERVER_URL
+
+# Prefetch the next chunk in the background while the current one executes,
+# so the control loop never stalls waiting for inference.
+executor = ThreadPoolExecutor(max_workers=1)
 chunk: list[list[float]] = []
+next_chunk: Future = executor.submit(fetch_chunk, url)  # kick off first request immediately
 
 try:
     while True:
         step_start = time.perf_counter()
 
         if not chunk:
-            chunk = fetch_chunk(url)
+            chunk = next_chunk.result()          # block only when buffer is truly empty
+            next_chunk = executor.submit(fetch_chunk, url)  # immediately start the next one
 
-        action = np.array(chunk.pop(0))
+        action = np.array(chunk.pop(0)).flatten()
         send_action(action)
 
         elapsed = time.perf_counter() - step_start
@@ -166,4 +177,5 @@ try:
             time.sleep(remaining)
 
 finally:
+    executor.shutdown(wait=False)
     cleanup()
