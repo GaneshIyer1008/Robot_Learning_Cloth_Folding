@@ -1,2 +1,6 @@
 .venv/
 .env
+episodes/
+logs/
+outputs/
+scripts/

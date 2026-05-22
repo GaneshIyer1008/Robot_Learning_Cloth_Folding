@@ -98,3 +98,21 @@ Update these fields:
 3. Merge dataset folders into one LeRobot root.
 4. Run training command above.
 5. Monitor OOM; if needed lower batch size.
+
+## W&B run shows “failed” + missing 30k artifact
+
+- **Why failed:** Training finished saving `checkpoints/030000`, then `wandb_logger.log_policy` tried to copy `model.safetensors` into `~/.local/share/wandb/artifacts/staging`. Disk was full → `OSError: No space left on device` → Python exited with an error → W&B marks the run as **crashed/failed**. Metrics logged earlier are still valid; only the **last** model artifact upload failed.
+- **Why 28k is last artifact:** Same reason — 30k upload never completed.
+- **Upload 30k to the same run** (after freeing disk; `wandb login` if needed):
+
+```bash
+cd "/path/to/Robot_Learning_Cloth_Folding"
+./.venv/bin/python scripts/upload_wandb_missing_checkpoint.py \
+  --run-id PASTE_RUN_ID_FROM_WANDB_URL \
+  --entity cloth-folding \
+  --project lerobot
+```
+
+Run ID is the last segment of `https://wandb.ai/<entity>/<project>/runs/<run_id>`.
+
+- **Avoid huge artifact copies on small disks:** add `--wandb.disable_artifact=true` to training (metrics still log; no checkpoint copy into W&B staging).
