@@ -67,3 +67,6 @@ echo "Then run eval (server first, client in another terminal):"
 echo "  bash run_eval_policy_server.sh"
 echo "  lerobot-find-port"
 echo "  bash run_eval_robot_client.sh <robot_port> <camera_path>"
+
+
+source ./.venv/bin/activate
