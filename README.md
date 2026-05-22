@@ -77,7 +77,7 @@ python -m lerobot.async_inference.policy_server --help
 
 ---
 
-## Step 4 — Pin exact environment (`requirements.txt`)
+<!-- ## Step 4 — Pin exact environment (`requirements.txt`)
 
 The file `requirements.txt` records packages from the **activated venv** so teammates can reproduce the same versions.
 
@@ -100,7 +100,7 @@ pip install -r requirements.txt
 pip install -e "./lerobot[feetech,multi_task_dit,async]"   # always use in-repo fork (overrides git+lerobot line in freeze)
 ```
 
-The frozen file may contain a `-e git+https://.../lerobot.git@...` line from an older install; the **in-repo** `./lerobot` path is the source of truth for this project.
+The frozen file may contain a `-e git+https://.../lerobot.git@...` line from an older install; the **in-repo** `./lerobot` path is the source of truth for this project. -->
 
 ---
 
