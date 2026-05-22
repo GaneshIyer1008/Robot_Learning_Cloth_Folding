@@ -14,6 +14,9 @@ Robot_Learning_Cloth_Folding/
 ├── logs/                       # Training / inference logs (gitignored)
 ├── .venv/                      # Python virtualenv (gitignored)
 ├── requirements.txt            # Frozen pip packages (reproducible env)
+├── setup_environment.sh        # One-time venv + deps install
+├── run_eval_policy_server.sh   # Eval task: async policy server
+├── run_eval_robot_client.sh    # Eval task: SO-101 robot client
 ├── README.md
 └── ...
 ```
@@ -189,6 +192,28 @@ Optional gripper emphasis (fork feature):
 
 These commands match the setup validated on our local machine. **You may need to tune** ports, camera device (`/dev/video0` vs `/dev/video2`), `fps`, and serial permissions on your hardware.
 
+**Quick start (scripts):**
+
+```bash
+bash setup_environment.sh          # once
+bash run_eval_policy_server.sh     # terminal 1
+```
+
+Before starting the client, discover the arm serial port (it changes between machines and USB replugs):
+
+```bash
+source .venv/bin/activate
+lerobot-find-port                  # e.g. /dev/ttyACM0 — use this in the command below
+lerobot-find-cameras opencv        # e.g. /dev/video0
+```
+
+```bash
+# terminal 2 (after server is up) — pass the ports you found, do not guess
+bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
+```
+
+Replace `/dev/ttyACM0` and `/dev/video0` with the values from the find commands on your system.
+
 ### Terminal 1 — Policy server
 
 ```bash
@@ -225,7 +250,7 @@ python -m lerobot.async_inference.robot_client \
 |-----------|--------|
 | `--policy_type` | Must match Hub model (`multi_task_dit`, not `pi05` / `smolvla` unless that is the checkpoint). |
 | `--pretrained_name_or_path` | Hugging Face **model** repo id or local `.../pretrained_model` path. |
-| `--robot.port` | Often `/dev/ttyACM0` or `/dev/ttyACM1` — use `lerobot-find-port`. |
+| `--robot.port` | From `lerobot-find-port` at inference time — passed to `run_eval_robot_client.sh` as the first argument. |
 | `--fps` | Align server, client, and camera; mismatch causes jerky control. |
 | `weighted_average` | Smoother than `latest_only` at chunk boundaries. |
 
