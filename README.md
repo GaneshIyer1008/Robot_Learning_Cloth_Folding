@@ -4,6 +4,78 @@ This repository contains everything needed for **data collection**, **training**
 
 ---
 
+## Quick start (recommended)
+
+This flow covers clone, environment install, and robot eval. It has been tested end-to-end on our setup.
+
+### 1. Clone
+
+```bash
+git clone https://github.com/GaneshIyer1008/Robot_Learning_Cloth_Folding.git
+cd Robot_Learning_Cloth_Folding
+```
+
+### 2. Credentials (once, local only — never commit)
+
+Create `~/.env_cloth_folding` with your Hugging Face token (needed to load policies from the Hub). `setup_environment.sh` will source this file if it exists.
+
+```bash
+cat > ~/.env_cloth_folding << 'ENVEOF'
+HF_TOKEN=hf_YOUR_TOKEN_HERE
+WANDB_API_KEY=YOUR_WANDB_KEY_HERE # needed only for training
+HF_USERNAME=cf-group-4
+ENVEOF
+
+source ~/.env_cloth_folding
+huggingface-cli login --token "$HF_TOKEN"
+```
+
+### 3. Install environment (once)
+
+```bash
+bash setup_environment.sh
+```
+
+This creates `.venv`, installs `requirements.txt`, and installs the in-repo LeRobot fork with `[feetech,multi_task_dit,async,dataset,viz]`.
+
+### 4. Run async inference
+
+**Terminal 1 — policy server**
+
+```bash
+bash run_eval_policy_server.sh
+```
+
+**Terminal 2 — robot client** (after the server is running)
+
+Discover ports at inference time (they change between machines and USB replugs):
+
+```bash
+source .venv/bin/activate
+lerobot-find-port                  # e.g. /dev/ttyACM0
+lerobot-find-cameras opencv        # e.g. /dev/video0
+```
+
+Pass the values you found — do not guess:
+
+```bash
+bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
+```
+
+Replace `/dev/ttyACM0` and `/dev/video0` with your actual paths. Press **ENTER** at the SO-101 calibration prompt if asked.
+
+**You may need to tune** `fps`, policy checkpoint (`PRETRAINED_NAME_OR_PATH`), and permissions on other hardware — see [Async inference details](#async-inference-details) below.
+
+### Daily use (new terminals)
+
+```bash
+cd Robot_Learning_Cloth_Folding
+source .venv/bin/activate
+source ~/.env_cloth_folding   # optional
+```
+
+---
+
 ## Repository layout
 
 ```
@@ -15,8 +87,8 @@ Robot_Learning_Cloth_Folding/
 ├── .venv/                      # Python virtualenv (gitignored)
 ├── requirements.txt            # Frozen pip packages (reproducible env)
 ├── setup_environment.sh        # One-time venv + deps install
-├── run_eval_policy_server.sh   # Eval task: async policy server
-├── run_eval_robot_client.sh    # Eval task: SO-101 robot client
+├── run_eval_policy_server.sh   # Eval: async policy server
+├── run_eval_robot_client.sh    # Eval: SO-101 robot client
 ├── README.md
 └── ...
 ```
@@ -28,110 +100,42 @@ Robot_Learning_Cloth_Folding/
 - **Python 3.12+** (LeRobot requirement)
 - **CUDA GPU** for training and policy-server inference
 - **SO-101 follower** + **OpenCV camera** for real-robot evaluation
-- **Hugging Face** and **W&B** accounts (tokens)
+- **Hugging Face** account (token); **W&B** optional for training
 
 ---
 
-## Step 1 — Clone this repo
+## Manual setup (optional)
+
+Use this only if you prefer not to run `setup_environment.sh`.
+
+<details>
+<summary>Expand manual steps</summary>
+
+### Clone and verify fork
 
 ```bash
 git clone https://github.com/GaneshIyer1008/Robot_Learning_Cloth_Folding.git
 cd Robot_Learning_Cloth_Folding
-```
-
-Confirm the fork is present:
-
-```bash
 ls lerobot/src/lerobot/policies/multi_task_dit/
 ```
 
----
-
-## Step 2 — Python virtual environment
+### Python venv
 
 ```bash
-cd Robot_Learning_Cloth_Folding
-
 python3 -m venv .venv
-source .venv/bin/activate          # Linux / macOS
-# .venv\Scripts\activate           # Windows
-
+source .venv/bin/activate
 pip install --upgrade pip setuptools wheel
 ```
 
----
-
-## Step 3 — Install LeRobot (editable, from `./lerobot`)
-
-Install the **in-repo fork** with extras used on this project:
+### Install LeRobot from `./lerobot`
 
 ```bash
 pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
 pip install huggingface_hub wandb
-```
-
-Verify:
-
-```bash
 python -c "import lerobot; print('lerobot OK')"
-lerobot-train --help
-python -m lerobot.async_inference.policy_server --help
 ```
 
----
-
-<!-- ## Step 4 — Pin exact environment (`requirements.txt`)
-
-The file `requirements.txt` records packages from the **activated venv** so teammates can reproduce the same versions.
-
-**Important:** run `pip freeze` only **after** activating `.venv`. If you freeze without the venv, system packages (apt) will pollute the file.
-
-Regenerate (maintainers):
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt    # optional: sync to existing pin file
-# or after a fresh install from Step 3:
-pip freeze > requirements.txt
-```
-
-New setup from pins only:
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e "./lerobot[feetech,multi_task_dit,async]"   # always use in-repo fork (overrides git+lerobot line in freeze)
-```
-
-The frozen file may contain a `-e git+https://.../lerobot.git@...` line from an older install; the **in-repo** `./lerobot` path is the source of truth for this project. -->
-
----
-
-## Step 5 — Credentials (local only, never commit)
-
-```bash
-cat > ~/.env_cloth_folding << 'ENVEOF'
-HF_TOKEN=hf_YOUR_TOKEN_HERE
-WANDB_API_KEY=YOUR_WANDB_KEY_HERE
-HF_USERNAME=cf-group-4
-ENVEOF
-
-source ~/.env_cloth_folding
-huggingface-cli login --token "$HF_TOKEN"
-wandb login
-```
-
----
-
-## Step 6 — Daily workflow
-
-Every new terminal:
-
-```bash
-cd Robot_Learning_Cloth_Folding
-source .venv/bin/activate
-source ~/.env_cloth_folding
-```
+</details>
 
 ---
 
@@ -166,6 +170,8 @@ python3 -c "import json; d=json.load(open('outputs/datasets/YOUR_MERGED_DATASET/
 ## Training (example)
 
 ```bash
+source .venv/bin/activate
+
 PYTORCH_ALLOC_CONF=expandable_segments:True lerobot-train \
   --dataset.repo_id=cf-group-4/YOUR_DATASET \
   --policy.type=multi_task_dit \
@@ -188,33 +194,11 @@ Optional gripper emphasis (fork feature):
 
 ---
 
-## Async inference (SO-101 + Multi-task DiT)
+## Async inference details
 
-These commands match the setup validated on our local machine. **You may need to tune** ports, camera device (`/dev/video0` vs `/dev/video2`), `fps`, and serial permissions on your hardware.
+The [Quick start](#quick-start-recommended) scripts wrap the commands below. Use the raw `python -m` commands if you need to customize flags.
 
-**Quick start (scripts):**
-
-```bash
-bash setup_environment.sh          # once
-bash run_eval_policy_server.sh     # terminal 1
-```
-
-Before starting the client, discover the arm serial port (it changes between machines and USB replugs):
-
-```bash
-source .venv/bin/activate
-lerobot-find-port                  # e.g. /dev/ttyACM0 — use this in the command below
-lerobot-find-cameras opencv        # e.g. /dev/video0
-```
-
-```bash
-# terminal 2 (after server is up) — pass the ports you found, do not guess
-bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
-```
-
-Replace `/dev/ttyACM0` and `/dev/video0` with the values from the find commands on your system.
-
-### Terminal 1 — Policy server
+### Policy server (manual)
 
 ```bash
 python -m lerobot.async_inference.policy_server \
@@ -223,9 +207,7 @@ python -m lerobot.async_inference.policy_server \
   --fps=5
 ```
 
-### Terminal 2 — Robot client
-
-Start the server first. Press **ENTER** at the SO-101 calibration prompt if asked.
+### Robot client (manual)
 
 ```bash
 python -m lerobot.async_inference.robot_client \
@@ -246,18 +228,26 @@ python -m lerobot.async_inference.robot_client \
   --debug_visualize_queue_size=true
 ```
 
+Example paths (`/dev/ttyACM0`, `/dev/video0`) are from our machine — always use `lerobot-find-port` and `lerobot-find-cameras opencv` on yours.
+
 | Parameter | Notes |
 |-----------|--------|
 | `--policy_type` | Must match Hub model (`multi_task_dit`, not `pi05` / `smolvla` unless that is the checkpoint). |
 | `--pretrained_name_or_path` | Hugging Face **model** repo id or local `.../pretrained_model` path. |
-| `--robot.port` | From `lerobot-find-port` at inference time — passed to `run_eval_robot_client.sh` as the first argument. |
+| `--robot.port` | From `lerobot-find-port` — first argument to `run_eval_robot_client.sh`. |
 | `--fps` | Align server, client, and camera; mismatch causes jerky control. |
 | `weighted_average` | Smoother than `latest_only` at chunk boundaries. |
+
+Override policy or timing on the client script via env vars, e.g.:
+
+```bash
+PRETRAINED_NAME_OR_PATH=cf-group-4/other_model bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
+```
 
 ### Robot / camera troubleshooting
 
 ```bash
-sudo chmod 666 /dev/ttyACM0 /dev/video0
+sudo chmod 666 /dev/ttyACM0 /dev/video0   # use your actual device paths
 lerobot-find-port
 lerobot-find-cameras opencv
 ```
@@ -273,7 +263,7 @@ cd lerobot
 git pull origin feature/multitask-dit-action-loss-weights
 cd ..
 source .venv/bin/activate
-pip install -e "./lerobot[feetech,multi_task_dit,async]"
+pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
 ```
 
 ---
@@ -283,10 +273,10 @@ pip install -e "./lerobot[feetech,multi_task_dit,async]"
 | Problem | Fix |
 |---------|-----|
 | `lerobot-train: command not found` | `source .venv/bin/activate` |
-| `ModuleNotFoundError: lerobot` | `pip install -e "./lerobot[feetech,multi_task_dit,async]"` |
+| `ModuleNotFoundError: lerobot` | `bash setup_environment.sh` or `pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"` |
 | `PI05Config has no attribute image_resize_shape` | Wrong `--policy_type`; use `pi05` for PI0.5 checkpoints, `multi_task_dit` for DiT. |
 | `config.json not found` on Hub | `--pretrained_name_or_path` points to a **dataset** repo, not a **model** repo. |
-| `requirements.txt` installs wrong packages | Regenerate with **venv activated** (see Step 4). |
+| Client script exits asking for port | Run `lerobot-find-port` and pass the path as the first argument. |
 | Matplotlib `FigureCanvasAgg` warnings | Drop `--debug_visualize_timeline` or set `MPLBACKEND=TkAgg`. |
 
 ---
@@ -297,4 +287,4 @@ pip install -e "./lerobot[feetech,multi_task_dit,async]"
 |------|--------|--------|
 | Data collection | Teleop PC | Record episodes, merge datasets, push to Hub |
 | Training | GPU machine / cloud | `lerobot-train`, W&B |
-| Evaluation | Robot PC | Async server + client (commands above) |
+| Evaluation | Robot PC | [Quick start](#quick-start-recommended) — server + client scripts |
