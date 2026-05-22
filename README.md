@@ -63,7 +63,7 @@ pip install --upgrade pip setuptools wheel
 Install the **in-repo fork** with extras used on this project:
 
 ```bash
-pip install -e "./lerobot[feetech,multi_task_dit,async,dataset]"
+pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
 pip install huggingface_hub wandb
 ```
 
