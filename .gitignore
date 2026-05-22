@@ -3,4 +3,5 @@
 episodes/
 logs/
 outputs/
+checkpoints/
 scripts/

@@ -1,44 +1,39 @@
 # Cloth Folding — Team Setup Guide
 
-This repository contains everything needed for **data collection**, **training**, **dataset merging**, and **async robot inference** for the SO-101 cloth-folding project. The team's **LeRobot fork** lives inside this repo at `lerobot/` (no separate sibling clone required).
+This repository contains everything needed for **async robot inference** on the SO-101 cloth-folding task. The **LeRobot fork** lives at `lerobot/`. The **policy checkpoint** is bundled locally at `checkpoints/cloth_folding_final3/` (no Hugging Face download required for eval).
 
 ---
 
 ## Quick start (recommended)
 
-This flow covers clone, environment install, and robot eval. It has been tested end-to-end on our setup.
+Tested end-to-end from the submission zip.
 
-### 1. Clone
-
-```bash
-git clone https://github.com/GaneshIyer1008/Robot_Learning_Cloth_Folding.git
-cd Robot_Learning_Cloth_Folding
-```
-
-### 2. Credentials (once, local only — never commit)
-
-Create `~/.env_cloth_folding` with your Hugging Face token (needed to load policies from the Hub). `setup_environment.sh` will source this file if it exists.
+### 1. Unzip and enter the project
 
 ```bash
-cat > ~/.env_cloth_folding << 'ENVEOF'
-HF_TOKEN=hf_YOUR_TOKEN_HERE
-WANDB_API_KEY=YOUR_WANDB_KEY_HERE # needed only for training
-HF_USERNAME=cf-group-4
-ENVEOF
-
-source ~/.env_cloth_folding
-huggingface-cli login --token "$HF_TOKEN"
+unzip -q Robot_Learning_Cloth_Folding.zip -d /tmp
+cd /tmp/Robot_Learning_Cloth_Folding_submission
 ```
 
-### 3. Install environment (once)
+(If your unzip folder has a different name, `cd` into that directory instead.)
+
+### 2. Install environment (once)
+
+Requires **Python 3.12+** and a **CUDA GPU** for the policy server.
 
 ```bash
 bash setup_environment.sh
 ```
 
-This creates `.venv`, installs `requirements.txt`, and installs the in-repo LeRobot fork with `[feetech,multi_task_dit,async,dataset,viz]`.
+This creates `.venv`, installs pinned dependencies from `requirements.txt`, and installs the in-repo LeRobot fork (`./lerobot`).
 
-### 4. Run async inference
+Confirm the local checkpoint is present:
+
+```bash
+ls checkpoints/cloth_folding_final3/model.safetensors
+```
+
+### 3. Run async inference
 
 **Terminal 1 — policy server**
 
@@ -48,30 +43,31 @@ bash run_eval_policy_server.sh
 
 **Terminal 2 — robot client** (after the server is running)
 
-Discover ports at inference time (they change between machines and USB replugs):
+Find the arm serial port and camera (do not guess — they change per machine and USB replug):
 
 ```bash
 source .venv/bin/activate
-lerobot-find-port                  # e.g. /dev/ttyACM0
-lerobot-find-cameras opencv        # e.g. /dev/video0
+lerobot-find-port
+bash find_devices.sh
 ```
 
-Pass the values you found — do not guess:
+Run the client with the paths you found:
 
 ```bash
 bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
 ```
 
-Replace `/dev/ttyACM0` and `/dev/video0` with your actual paths. Press **ENTER** at the SO-101 calibration prompt if asked.
+Replace `/dev/ttyACM0` and `/dev/video0` with your actual values. Press **ENTER** at the SO-101 calibration prompt if asked.
 
-**You may need to tune** `fps`, policy checkpoint (`PRETRAINED_NAME_OR_PATH`), and permissions on other hardware — see [Async inference details](#async-inference-details) below.
+The client loads the policy from **`checkpoints/cloth_folding_final3/`** only (no Hub access needed).
+
+**You may need to tune** `fps` and device permissions on other hardware — see [Async inference details](#async-inference-details).
 
 ### Daily use (new terminals)
 
 ```bash
-cd Robot_Learning_Cloth_Folding
+cd /path/to/Robot_Learning_Cloth_Folding_submission
 source .venv/bin/activate
-source ~/.env_cloth_folding   # optional
 ```
 
 ---
@@ -80,98 +76,117 @@ source ~/.env_cloth_folding   # optional
 
 ```
 Robot_Learning_Cloth_Folding/
-├── lerobot/                    # Team LeRobot fork (branch: feature/multitask-dit-action-loss-weights)
-├── scripts/                    # Dataset merge / upload helpers
-├── outputs/                    # Local datasets & training runs (gitignored)
-├── logs/                       # Training / inference logs (gitignored)
-├── .venv/                      # Python virtualenv (gitignored)
-├── requirements.txt            # Frozen pip packages (reproducible env)
-├── setup_environment.sh        # One-time venv + deps install
-├── run_eval_policy_server.sh   # Eval: async policy server
-├── run_eval_robot_client.sh    # Eval: SO-101 robot client
-├── README.md
-└── ...
+├── lerobot/                      # Team LeRobot fork
+├── checkpoints/
+│   └── cloth_folding_final3/     # Local policy (model.safetensors, config, …)
+├── requirements.txt
+├── setup_environment.sh
+├── find_devices.sh               # Find robot port + camera
+├── run_eval_policy_server.sh
+├── run_eval_robot_client.sh
+├── scripts/                      # Dataset merge / training helpers
+└── README.md
 ```
 
 ---
 
 ## Prerequisites
 
-- **Python 3.12+** (LeRobot requirement)
-- **CUDA GPU** for training and policy-server inference
-- **SO-101 follower** + **OpenCV camera** for real-robot evaluation
-- **Hugging Face** account (token); **W&B** optional for training
+- **Python 3.12+**
+- **CUDA GPU** for policy-server inference
+- **SO-101 follower** + **OpenCV camera**
+- Linux USB permissions for `/dev/ttyACM*` and `/dev/video*`
 
 ---
 
-## Manual setup (optional)
+## Async inference details
 
-Use this only if you prefer not to run `setup_environment.sh`.
+The [Quick start](#quick-start-recommended) scripts wrap the commands below.
 
-<details>
-<summary>Expand manual steps</summary>
+| Script | Role |
+|--------|------|
+| `run_eval_policy_server.sh` | Loads policy from `checkpoints/cloth_folding_final3/`, serves actions on `127.0.0.1:8080` |
+| `find_devices.sh` | Runs `python -m lerobot.scripts.lerobot_find_port` and `lerobot_find_cameras` |
+| `run_eval_robot_client.sh` | Connects robot + camera to server; requires `<robot_port>` and `<camera_path>` args |
 
-### Clone and verify fork
+Default policy path (set in `run_eval_robot_client.sh`):
 
-```bash
-git clone https://github.com/GaneshIyer1008/Robot_Learning_Cloth_Folding.git
-cd Robot_Learning_Cloth_Folding
-ls lerobot/src/lerobot/policies/multi_task_dit/
+```
+checkpoints/cloth_folding_final3/
 ```
 
-### Python venv
+### Policy server (manual)
+
+```bash
+source .venv/bin/activate
+python -m lerobot.async_inference.policy_server \
+  --host=127.0.0.1 \
+  --port=8080 \
+  --fps=5
+```
+
+### Robot client (manual)
+
+```bash
+source .venv/bin/activate
+python -m lerobot.async_inference.robot_client \
+  --server_address=127.0.0.1:8080 \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM0 \
+  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video0, width: 640, height: 480, fps: 30}}" \
+  --task="cloth-folding-grasping-only" \
+  --policy_type=multi_task_dit \
+  --pretrained_name_or_path="$(pwd)/checkpoints/cloth_folding_final3" \
+  --policy_device=cuda \
+  --client_device=cpu \
+  --actions_per_chunk=32 \
+  --chunk_size_threshold=0.9 \
+  --aggregate_fn_name=weighted_average \
+  --fps=15 \
+  --display_data=true \
+  --debug_visualize_queue_size=true
+```
+
+| Parameter | Notes |
+|-----------|--------|
+| `--policy_type` | `multi_task_dit` for this checkpoint |
+| `--pretrained_name_or_path` | Local folder only: `checkpoints/cloth_folding_final3` |
+| `--robot.port` | From `bash find_devices.sh` — first arg to `run_eval_robot_client.sh` |
+| `--fps` | Align server, client, and camera; mismatch causes jerky control |
+| `weighted_average` | Smoother than `latest_only` at chunk boundaries |
+
+### Robot / camera troubleshooting
+
+```bash
+sudo chmod 666 /dev/ttyACM0 /dev/video0   # use your actual device paths
+bash find_devices.sh
+```
+
+If you see `no status packet` from Dynamixel: free the port, replug USB, and stop other processes using the arm.
+
+---
+
+## Training & datasets (optional)
+
+For retraining or dataset work, activate the venv and use `lerobot-train` / `scripts/merge_dataset_roots_and_push.py`. Hugging Face and W&B credentials are only needed for that workflow, not for zip-based eval.
+
+<details>
+<summary>Manual environment install</summary>
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip setuptools wheel
-```
-
-### Install LeRobot from `./lerobot`
-
-```bash
+grep -vE 'git\+.*lerobot' requirements.txt | pip install -r /dev/stdin
 pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
-pip install huggingface_hub wandb
-python -c "import lerobot; print('lerobot OK')"
 ```
 
 </details>
 
----
-
-## Dataset merging & Hub upload
-
-Helper script: `scripts/merge_dataset_roots_and_push.py`
-
-Example — merge two local LeRobot roots and push:
+<details>
+<summary>Example training command</summary>
 
 ```bash
-export BASE="/path/to/your/workspace"
-
-python scripts/merge_dataset_roots_and_push.py \
-  --output-repo-id cf-group-4/YOUR_MERGED_DATASET \
-  --output-root outputs/datasets/YOUR_MERGED_DATASET \
-  --push-to-hub \
-  --inputs \
-    "${BASE}/path/to/dataset_a" \
-    "${BASE}/path/to/dataset_b"
-```
-
-Each `--inputs` path must contain `meta/info.json` (full LeRobot dataset root).
-
-Check episode count:
-
-```bash
-python3 -c "import json; d=json.load(open('outputs/datasets/YOUR_MERGED_DATASET/meta/info.json')); print(d['total_episodes'], 'episodes')"
-```
-
----
-
-## Training (example)
-
-```bash
-source .venv/bin/activate
-
 PYTORCH_ALLOC_CONF=expandable_segments:True lerobot-train \
   --dataset.repo_id=cf-group-4/YOUR_DATASET \
   --policy.type=multi_task_dit \
@@ -186,85 +201,9 @@ PYTORCH_ALLOC_CONF=expandable_segments:True lerobot-train \
   --job_name=your_run_name
 ```
 
-Optional gripper emphasis (fork feature):
+Optional gripper emphasis: `--policy.action_loss_weights=[1,1,1,1,1,2]`
 
-```bash
---policy.action_loss_weights=[1,1,1,1,1,2]
-```
-
----
-
-## Async inference details
-
-The [Quick start](#quick-start-recommended) scripts wrap the commands below. Use the raw `python -m` commands if you need to customize flags.
-
-### Policy server (manual)
-
-```bash
-python -m lerobot.async_inference.policy_server \
-  --host=127.0.0.1 \
-  --port=8080 \
-  --fps=5
-```
-
-### Robot client (manual)
-
-```bash
-python -m lerobot.async_inference.robot_client \
-  --server_address=127.0.0.1:8080 \
-  --robot.type=so101_follower \
-  --robot.port=/dev/ttyACM0 \
-  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video0, width: 640, height: 480, fps: 30}}" \
-  --task="cloth-folding-grasping-only" \
-  --policy_type=multi_task_dit \
-  --pretrained_name_or_path=cf-group-4/cloth_folding_final3 \
-  --policy_device=cuda \
-  --client_device=cpu \
-  --actions_per_chunk=32 \
-  --chunk_size_threshold=0.9 \
-  --aggregate_fn_name=weighted_average \
-  --fps=15 \
-  --display_data=true \
-  --debug_visualize_queue_size=true
-```
-
-Example paths (`/dev/ttyACM0`, `/dev/video0`) are from our machine — always use `lerobot-find-port` and `lerobot-find-cameras opencv` on yours.
-
-| Parameter | Notes |
-|-----------|--------|
-| `--policy_type` | Must match Hub model (`multi_task_dit`, not `pi05` / `smolvla` unless that is the checkpoint). |
-| `--pretrained_name_or_path` | Hugging Face **model** repo id or local `.../pretrained_model` path. |
-| `--robot.port` | From `lerobot-find-port` — first argument to `run_eval_robot_client.sh`. |
-| `--fps` | Align server, client, and camera; mismatch causes jerky control. |
-| `weighted_average` | Smoother than `latest_only` at chunk boundaries. |
-
-Override policy or timing on the client script via env vars, e.g.:
-
-```bash
-PRETRAINED_NAME_OR_PATH=cf-group-4/other_model bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
-```
-
-### Robot / camera troubleshooting
-
-```bash
-sudo chmod 666 /dev/ttyACM0 /dev/video0   # use your actual device paths
-lerobot-find-port
-lerobot-find-cameras opencv
-```
-
-If you see `no status packet` from Dynamixel: free the port, replug USB, lower `--fps` to **30**, and stop other processes using the arm.
-
----
-
-## Updating the in-repo LeRobot fork
-
-```bash
-cd lerobot
-git pull origin feature/multitask-dit-action-loss-weights
-cd ..
-source .venv/bin/activate
-pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
-```
+</details>
 
 ---
 
@@ -272,12 +211,13 @@ pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
 
 | Problem | Fix |
 |---------|-----|
+| `Local checkpoint not found` | Ensure `checkpoints/cloth_folding_final3/model.safetensors` exists in the unzip folder |
 | `lerobot-train: command not found` | `source .venv/bin/activate` |
-| `ModuleNotFoundError: lerobot` | `bash setup_environment.sh` or `pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"` |
-| `PI05Config has no attribute image_resize_shape` | Wrong `--policy_type`; use `pi05` for PI0.5 checkpoints, `multi_task_dit` for DiT. |
-| `config.json not found` on Hub | `--pretrained_name_or_path` points to a **dataset** repo, not a **model** repo. |
-| Client script exits asking for port | Run `lerobot-find-port` and pass the path as the first argument. |
-| Matplotlib `FigureCanvasAgg` warnings | Drop `--debug_visualize_timeline` or set `MPLBACKEND=TkAgg`. |
+| `ModuleNotFoundError: lerobot` | Re-run `bash setup_environment.sh` |
+| `No module named 'lerobot.scripts'` | Re-run `bash setup_environment.sh`; use `bash find_devices.sh` |
+| Client script exits asking for port | Run `bash find_devices.sh`, pass port as first argument |
+| `PI05Config has no attribute image_resize_shape` | Wrong `--policy_type`; this checkpoint needs `multi_task_dit` |
+| Matplotlib `FigureCanvasAgg` warnings | Drop `--debug_visualize_timeline` or set `MPLBACKEND=TkAgg` |
 
 ---
 
@@ -285,6 +225,5 @@ pip install -e "./lerobot[feetech,multi_task_dit,async,dataset,viz]"
 
 | Role | Where | Tasks |
 |------|--------|--------|
-| Data collection | Teleop PC | Record episodes, merge datasets, push to Hub |
-| Training | GPU machine / cloud | `lerobot-train`, W&B |
-| Evaluation | Robot PC | [Quick start](#quick-start-recommended) — server + client scripts |
+| Evaluation | Robot PC | Unzip → `setup_environment.sh` → server + client scripts |
+| Training | GPU machine | `lerobot-train`, dataset merge scripts (optional) |

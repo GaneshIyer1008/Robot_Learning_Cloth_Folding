@@ -1,6 +1,6 @@
 # Frozen from .venv (123 packages). Regenerate: source .venv/bin/activate && pip freeze > requirements.txt
-# After pip install -r requirements.txt, install the in-repo fork (overrides any git+lerobot line below):
-#   pip install -e "./lerobot[feetech,multi_task_dit,async]"
+# Do NOT add lerobot here — setup_environment.sh installs ./lerobot in editable mode.
+# (An old git+lerobot pin breaks console tools like lerobot-find-port.)
 accelerate==1.13.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.5
@@ -48,7 +48,6 @@ importlib_metadata==9.0.0
 Jinja2==3.1.6
 jsonlines==4.0.0
 kiwisolver==1.5.0
--e git+https://github.com/Adhithya-Laxman/lerobot.git@e5d46d69faf57e88a8b12616843983f6e5159a3c#egg=lerobot
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 matplotlib==3.10.9

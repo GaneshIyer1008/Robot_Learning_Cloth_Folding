@@ -11,7 +11,8 @@
 # Example:
 #   bash run_eval_robot_client.sh /dev/ttyACM0 /dev/video0
 #
-# Optional overrides via env: SERVER_ADDRESS, PRETRAINED_NAME_OR_PATH, CLIENT_FPS, ...
+# Policy loads from local checkpoints/ only (override with PRETRAINED_NAME_OR_PATH if needed).
+# Optional overrides via env: SERVER_ADDRESS, CLIENT_FPS, ...
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,10 +56,17 @@ if [[ -z "$CAMERA_PATH" ]]; then
   exit 1
 fi
 
+LOCAL_CHECKPOINT="${REPO_ROOT}/checkpoints/cloth_folding_final3"
+if [[ ! -f "${LOCAL_CHECKPOINT}/model.safetensors" ]]; then
+  echo "ERROR: Local checkpoint not found: ${LOCAL_CHECKPOINT}/model.safetensors"
+  echo "Run: bash scripts/download_checkpoint.sh"
+  exit 1
+fi
+
 SERVER_ADDRESS="${SERVER_ADDRESS:-127.0.0.1:8080}"
 TASK="${TASK:-cloth-folding-grasping-only}"
 POLICY_TYPE="${POLICY_TYPE:-multi_task_dit}"
-PRETRAINED_NAME_OR_PATH="${PRETRAINED_NAME_OR_PATH:-cf-group-4/cloth_folding_final3}"
+PRETRAINED_NAME_OR_PATH="${PRETRAINED_NAME_OR_PATH:-$LOCAL_CHECKPOINT}"
 POLICY_DEVICE="${POLICY_DEVICE:-cuda}"
 CLIENT_DEVICE="${CLIENT_DEVICE:-cpu}"
 ACTIONS_PER_CHUNK="${ACTIONS_PER_CHUNK:-32}"

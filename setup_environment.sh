@@ -34,13 +34,16 @@ source "$VENV_DIR/bin/activate"
 echo "==> Upgrading pip"
 pip install --upgrade pip setuptools wheel
 
+# Install deps only (never install lerobot from requirements.txt git pin)
 if [[ -f "$REPO_ROOT/requirements.txt" ]]; then
-  echo "==> Installing pinned packages from requirements.txt"
-  pip install -r "$REPO_ROOT/requirements.txt"
+  echo "==> Installing pinned packages (excluding lerobot)"
+  grep -vE '^[[:space:]]*(-e[[:space:]]+)?git\+.*lerobot|^[[:space:]]*#.*lerobot' \
+    "$REPO_ROOT/requirements.txt" | pip install -r /dev/stdin
 fi
 
-echo "==> Installing in-repo LeRobot (editable)"
-pip install -e "$REPO_ROOT/lerobot[feetech,multi_task_dit,async,dataset,viz]"
+echo "==> Installing in-repo LeRobot (editable, force reinstall)"
+pip uninstall -y lerobot 2>/dev/null || true
+pip install -e "$REPO_ROOT/lerobot[feetech,multi_task_dit,async,dataset,viz]" --force-reinstall
 pip install huggingface_hub wandb
 
 if [[ -f "${HOME}/.env_cloth_folding" ]]; then
@@ -48,25 +51,24 @@ if [[ -f "${HOME}/.env_cloth_folding" ]]; then
   # shellcheck source=/dev/null
   source "${HOME}/.env_cloth_folding"
   if [[ -n "${HF_TOKEN:-}" ]]; then
-    huggingface-cli login --token "$HF_TOKEN" || true
+    huggingface-cli login --token "$HF_TOKEN" 2>/dev/null || hf auth login --token "$HF_TOKEN" 2>/dev/null || true
   fi
 else
-  echo "NOTE: Create ~/.env_cloth_folding with HF_TOKEN for Hub model download (see README)."
+  echo "NOTE: ~/.env_cloth_folding optional for local checkpoint eval."
 fi
 
 echo "==> Verifying install"
-python -c "import lerobot; print('lerobot OK')"
+python -c "import lerobot; print('lerobot', lerobot.__version__)"
+python -c "import lerobot.scripts.lerobot_find_port; print('lerobot.scripts OK')"
 python -m lerobot.async_inference.policy_server --help >/dev/null
 
 echo ""
 echo "Setup complete. Activate with:"
 echo "  source $VENV_DIR/bin/activate"
-echo "  source ~/.env_cloth_folding   # optional"
 echo ""
-echo "Then run eval (server first, client in another terminal):"
+echo "Find robot port + camera:"
+echo "  bash find_devices.sh"
+echo ""
+echo "Eval (server first, then client):"
 echo "  bash run_eval_policy_server.sh"
-echo "  lerobot-find-port"
 echo "  bash run_eval_robot_client.sh <robot_port> <camera_path>"
-
-
-source ./.venv/bin/activate
